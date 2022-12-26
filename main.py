@@ -7,7 +7,7 @@ response = requests.get(url)
 lyrics = response.text
 
 # Get the user's search term
-search_term = input("Enter a word or phrase to search for in the lyrics: ")
+search_term = input("Enter keyword to search: ")
 
 # Find the number of occurrences of the search term in the lyrics
 num_occurrences = lyrics.count(search_term)
