@@ -2,7 +2,7 @@ import requests
 import json
 
 # Get the lyrics from the URL
-url = ""
+url = "https://raw.githubusercontent.com/leejaew/SearchKeywordOccurrences/main/lyrics.txt"
 response = requests.get(url)
 lyrics = response.text
 
