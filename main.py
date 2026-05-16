@@ -4,6 +4,8 @@ import ipaddress
 from urllib.parse import urlparse
 
 import requests
+from curl_cffi import requests as cffi_requests
+from bs4 import BeautifulSoup
 from flask import Flask, render_template, request
 from markupsafe import Markup, escape
 
@@ -13,9 +15,15 @@ DEFAULT_LYRICS_URL = "https://raw.githubusercontent.com/leejaew/SearchKeywordOcc
 
 MAX_URL_LENGTH = 2048
 MAX_QUERY_LENGTH = 200
-MAX_CONTENT_BYTES = 2 * 1024 * 1024  # 2 MB
-REQUEST_TIMEOUT = 10
+MAX_CONTENT_BYTES = 4 * 1024 * 1024  # 4 MB
+REQUEST_TIMEOUT = 15
 MAX_RESULT_LINES = 10
+
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
 
 ALLOWED_TEXT_CONTENT_TYPES = (
     "text/plain",
@@ -27,14 +35,31 @@ ALLOWED_TEXT_CONTENT_TYPES = (
     "text/xml",
 )
 
-HTML_SNIFF_PATTERNS = re.compile(
-    r"<\s*(html|body|head|script|!doctype|style|iframe|meta|link)\b",
-    re.IGNORECASE,
+HTML_CONTENT_TYPES = ("text/html", "application/xhtml+xml")
+
+# Tags whose contents should be stripped completely before extracting text.
+HTML_STRIP_TAGS = (
+    "script", "style", "noscript", "template", "iframe",
+    "header", "footer", "nav", "aside", "form", "button",
+    "menu", "svg", "canvas",
+)
+
+# CSS selectors used to locate the lyric/article body on common sites.
+# Tried in order; first non-empty match wins.
+LYRIC_SELECTORS = (
+    '[data-lyrics-container="true"]',           # Genius
+    'div.lyrics',                                # Genius (legacy)
+    'div[class*="Lyrics__Container"]',           # Genius (newer)
+    'div[class*="lyrics_box"]',                  # AZLyrics-style
+    'div.ringtone ~ div',                        # AZLyrics: lyrics div after ringtone
+    'pre.lyric-body',                            # LyricsFreak
+    'div.song_body-lyrics',                      # Songlyrics
+    'article',                                   # Generic article
+    'main',                                      # Generic main
 )
 
 
 def is_safe_url(url):
-    """Validate the URL: scheme must be http/https; host must be public."""
     if not url or len(url) > MAX_URL_LENGTH:
         return False, "URL is missing or too long."
 
@@ -49,7 +74,6 @@ def is_safe_url(url):
     if not parsed.hostname:
         return False, "URL is missing a hostname."
 
-    # SSRF protection: block private, loopback, link-local, multicast addresses.
     try:
         addr_infos = socket.getaddrinfo(parsed.hostname, None)
     except socket.gaierror:
@@ -74,64 +98,145 @@ def is_safe_url(url):
     return True, None
 
 
+def extract_text_from_html(html):
+    """Pull the most lyric-like / article-like text out of an HTML document."""
+    soup = BeautifulSoup(html, "lxml")
+
+    # Strip non-content elements outright.
+    for tag in soup(HTML_STRIP_TAGS):
+        tag.decompose()
+
+    # Replace <br> with a newline so line breaks survive get_text().
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+
+    candidates = []
+
+    for selector in LYRIC_SELECTORS:
+        try:
+            elements = soup.select(selector)
+        except Exception:
+            continue
+        if not elements:
+            continue
+        text_parts = [el.get_text("\n", strip=False) for el in elements]
+        combined = "\n".join(text_parts).strip()
+        if len(combined) >= 80:
+            candidates.append(combined)
+            break  # first matching selector wins
+
+    if not candidates:
+        # Fall back to the whole body's visible text.
+        body = soup.body or soup
+        candidates.append(body.get_text("\n", strip=False))
+
+    text = candidates[0]
+
+    # Collapse runs of blank lines and trim each line.
+    lines = [ln.strip() for ln in text.splitlines()]
+    cleaned = []
+    blank = False
+    for ln in lines:
+        if not ln:
+            if not blank:
+                cleaned.append("")
+            blank = True
+        else:
+            cleaned.append(ln)
+            blank = False
+
+    return "\n".join(cleaned).strip()
+
+
 def fetch_text(url):
-    """Fetch the URL and return plain-text content, or an error message."""
+    """Fetch the URL and return cleaned plain-text content, or an error message.
+
+    Uses curl_cffi to impersonate a real Chrome browser (TLS + HTTP/2 fingerprint),
+    which lets us through many soft anti-bot checks. Falls back to vanilla
+    requests if curl_cffi raises.
+    """
+    response = None
     try:
-        response = requests.get(
+        response = cffi_requests.get(
             url,
             timeout=REQUEST_TIMEOUT,
-            stream=True,
-            headers={"User-Agent": "LyricSearch/1.0"},
+            impersonate="chrome131",
+            headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
             allow_redirects=True,
         )
-    except requests.RequestException as e:
-        return None, f"Request failed: {type(e).__name__}"
+    except Exception:
+        try:
+            response = requests.get(
+                url,
+                timeout=REQUEST_TIMEOUT,
+                stream=False,
+                headers={
+                    "User-Agent": BROWSER_USER_AGENT,
+                    "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+                allow_redirects=True,
+            )
+        except requests.RequestException as e:
+            return None, f"Request failed: {type(e).__name__}"
 
     try:
+        if response.status_code == 403:
+            return (
+                None,
+                "Source returned HTTP 403 (Forbidden). The site is blocking automated "
+                "requests from this server. Try a URL that points directly to a plain-text "
+                "file (for example a raw GitHub link), or a site without bot protection.",
+            )
+
+        if response.status_code == 429:
+            return None, "Source returned HTTP 429. Too many requests — try again later."
+
         if response.status_code != 200:
             return None, f"Source returned HTTP {response.status_code}."
 
         content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
-        if content_type and not any(content_type.startswith(t) for t in ALLOWED_TEXT_CONTENT_TYPES):
+
+        is_html = any(content_type.startswith(t) for t in HTML_CONTENT_TYPES)
+        is_text = any(content_type.startswith(t) for t in ALLOWED_TEXT_CONTENT_TYPES)
+
+        if content_type and not is_html and not is_text:
             return (
                 None,
-                f"Source content type '{content_type}' is not plain text. "
-                "Please provide a URL pointing directly to a .txt file.",
+                f"Source content type '{content_type}' is not text or HTML.",
             )
 
-        # Read up to MAX_CONTENT_BYTES to avoid huge responses.
-        chunks = []
-        total = 0
-        for chunk in response.iter_content(chunk_size=16384, decode_unicode=False):
-            if not chunk:
-                continue
-            total += len(chunk)
-            if total > MAX_CONTENT_BYTES:
-                return None, "Source is too large (max 2 MB)."
-            chunks.append(chunk)
+        raw = response.content
+        if len(raw) > MAX_CONTENT_BYTES:
+            return None, "Source is too large (max 4 MB)."
 
-        raw = b"".join(chunks)
         encoding = response.encoding or "utf-8"
         try:
-            text = raw.decode(encoding, errors="replace")
+            body = raw.decode(encoding, errors="replace")
         except (LookupError, TypeError):
-            text = raw.decode("utf-8", errors="replace")
+            body = raw.decode("utf-8", errors="replace")
 
-        # Even with a permissive content type, sniff for HTML markup.
-        if HTML_SNIFF_PATTERNS.search(text[:4096]):
-            return (
-                None,
-                "Source appears to contain HTML markup. Please provide a URL "
-                "pointing directly to a plain-text file.",
-            )
+        if not content_type:
+            is_html = bool(re.search(r"<\s*html\b", body[:4096], re.IGNORECASE))
 
-        return text, None
+        if is_html:
+            text = extract_text_from_html(body)
+            if not text or len(text) < 20:
+                return None, "Could not extract any readable text from the page."
+            return text, None
+
+        return body, None
     finally:
-        response.close()
+        try:
+            response.close()
+        except Exception:
+            pass
 
 
 def highlight_line(line, query):
-    """Escape the line, then wrap case-insensitive matches of query in <mark>."""
     escaped_line = str(escape(line))
     escaped_query = str(escape(query))
     if not escaped_query:
