@@ -1,0 +1,64 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.Python
+build/
+dist/
+.eggs/
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+.env
+ENV/
+"venv (deactivated)"/
+.pythonlibs/
+
+# --- Package manager caches ---
+.cache/
+.upm/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# --- Type checkers / linters ---
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# --- Replit-specific local artifacts ---
+# Keep .replit and replit.nix (project config) but exclude per-user state.
+.breakpoints
+.config/
+.local/
+.agents/
+attached_assets/
+VENV.md
+
+# --- Secrets ---
+# Never commit env files. If you need an example, use .env.example instead.
+.env
+.env.*
+!.env.example
+
+# --- Logs ---
+*.log
+logs/
