@@ -206,6 +206,8 @@
         placeholder="https://example.com/lyrics.txt"
         value="{{ url }}"
         autocomplete="off"
+        maxlength="2048"
+        pattern="https?://.+"
         required
       />
       <p class="hint">
@@ -220,6 +222,7 @@
           placeholder="e.g. love"
           value="{{ query }}"
           autocomplete="off"
+          maxlength="200"
           autofocus
           required
         />
@@ -243,12 +246,10 @@
       {% if result.count == 0 %}
         <p class="zero">No lines matched. Try a different keyword.</p>
       {% else %}
-        <div class="lines-label">Matching lines{% if result.lines|length == 10 %} &nbsp;(top 10){% endif %}</div>
+        <div class="lines-label">Matching lines{% if result.lines|length >= max_result_lines %} &nbsp;(top {{ max_result_lines }}){% endif %}</div>
         <div class="lines">
           {% for line in result.lines %}
-            <div class="line">
-              {{ line | replace(result.query, '<mark>' ~ result.query ~ '</mark>') | safe }}
-            </div>
+            <div class="line">{{ line }}</div>
           {% endfor %}
         </div>
       {% endif %}
