@@ -30,4 +30,4 @@ expertMode = true
 
 [deployment]
 deploymentTarget = "vm"
-run = ["python3", "main.py"]
+run = ["python3", "main.py", "love"]
