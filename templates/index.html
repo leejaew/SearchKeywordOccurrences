@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lyric Search</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    .label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #f0f0f0;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    form {
+      display: flex;
+      gap: 8px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: #111;
+      border: 1px solid #2e2e2e;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #e8e8e8;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]::placeholder { color: #444; }
+    input[type="text"]:focus { border-color: #555; }
+
+    button {
+      background: #f0f0f0;
+      color: #0f0f0f;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    button:hover { background: #d8d8d8; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #222;
+      margin: 28px 0;
+    }
+
+    .result-count {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+
+    .result-count strong {
+      color: #e8e8e8;
+      font-size: 28px;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #222;
+      border: 1px solid #2e2e2e;
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 11px;
+      font-family: monospace;
+      color: #aaa;
+      margin-bottom: 16px;
+    }
+
+    .lines-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 10px;
+    }
+
+    .lines {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .line {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 13px;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    .line mark {
+      background: transparent;
+      color: #f0f0f0;
+      font-weight: 600;
+    }
+
+    .zero {
+      font-size: 13px;
+      color: #555;
+      padding: 16px 0;
+    }
+
+    .error-msg {
+      font-size: 13px;
+      color: #c0392b;
+      padding: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="label">Lyric Search</div>
+    <h1>Search the lyrics</h1>
+    <p class="subtitle">Enter any word or phrase to find how many times it appears in the song.</p>
+
+    <form method="GET" action="/">
+      <input
+        type="text"
+        name="q"
+        placeholder="e.g. love"
+        value="{{ query }}"
+        autocomplete="off"
+        autofocus
+      />
+      <button type="submit">Search</button>
+    </form>
+
+    {% if error %}
+      <hr class="divider" />
+      <p class="error-msg">{{ error }}</p>
+
+    {% elif result is not none %}
+      <hr class="divider" />
+
+      <div class="result-count">
+        <strong>{{ result.count }}</strong>
+        occurrence{{ 's' if result.count != 1 else '' }} of
+      </div>
+      <span class="badge">{{ result.query }}</span>
+
+      {% if result.count == 0 %}
+        <p class="zero">No lines matched. Try a different keyword.</p>
+      {% else %}
+        <div class="lines-label">Matching lines{% if result.lines|length == 10 %} &nbsp;(top 10){% endif %}</div>
+        <div class="lines">
+          {% for line in result.lines %}
+            <div class="line">
+              {{ line | replace(result.query, '<mark>' ~ result.query ~ '</mark>') | safe }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</body>
+</html>

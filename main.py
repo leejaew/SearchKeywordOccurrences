@@ -1,28 +1,39 @@
 import requests
 import json
-import sys
+from flask import Flask, render_template, request
 
-# Get the search term from command-line argument
-if len(sys.argv) < 2:
-    print(json.dumps({"error": "Usage: python3 main.py <keyword>"}))
-    sys.exit(1)
+app = Flask(__name__)
 
-search_term = sys.argv[1]
+LYRICS_URL = "https://raw.githubusercontent.com/leejaew/SearchKeywordOccurrences/main/lyrics.txt"
 
-# Get the lyrics from the URL
-url = "https://raw.githubusercontent.com/leejaew/SearchKeywordOccurrences/main/lyrics.txt"
-response = requests.get(url)
-lyrics = response.text
+def fetch_lyrics():
+    try:
+        response = requests.get(LYRICS_URL, timeout=10)
+        response.raise_for_status()
+        return response.text, None
+    except requests.RequestException as e:
+        return None, str(e)
 
-# Find the number of occurrences of the search term in the lyrics
-num_occurrences = lyrics.count(search_term)
+@app.route("/", methods=["GET"])
+def index():
+    query = request.args.get("q", "").strip()
+    result = None
+    error = None
 
-# Generate the response payload in JSON format
-payload = {
-    "search_term": search_term,
-    "num_occurrences": num_occurrences
-}
-response_json = json.dumps(payload)
+    if query:
+        lyrics, fetch_error = fetch_lyrics()
+        if fetch_error:
+            error = "Could not fetch lyrics. Please try again."
+        else:
+            count = lyrics.lower().count(query.lower())
+            lines = [line.strip() for line in lyrics.splitlines() if query.lower() in line.lower() and line.strip()]
+            result = {
+                "query": query,
+                "count": count,
+                "lines": lines[:10]
+            }
 
-# Print the response payload
-print(response_json)
+    return render_template("index.html", result=result, error=error, query=query)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=False)
