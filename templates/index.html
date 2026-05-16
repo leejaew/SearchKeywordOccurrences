@@ -52,11 +52,27 @@
 
     form {
       display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: -4px;
+    }
+
+    .row {
+      display: flex;
       gap: 8px;
     }
 
-    input[type="text"] {
+    input[type="text"], input[type="url"] {
       flex: 1;
+      width: 100%;
       background: #111;
       border: 1px solid #2e2e2e;
       border-radius: 8px;
@@ -65,10 +81,11 @@
       color: #e8e8e8;
       outline: none;
       transition: border-color 0.15s;
+      font-family: inherit;
     }
 
-    input[type="text"]::placeholder { color: #444; }
-    input[type="text"]:focus { border-color: #555; }
+    input::placeholder { color: #444; }
+    input:focus { border-color: #555; }
 
     button {
       background: #f0f0f0;
@@ -84,6 +101,19 @@
     }
 
     button:hover { background: #d8d8d8; }
+
+    .hint {
+      font-size: 11px;
+      color: #444;
+      margin-top: -2px;
+    }
+
+    .hint a {
+      color: #777;
+      text-decoration: none;
+      border-bottom: 1px dotted #444;
+    }
+    .hint a:hover { color: #aaa; }
 
     .divider {
       border: none;
@@ -158,25 +188,43 @@
       font-size: 13px;
       color: #c0392b;
       padding: 16px 0;
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="label">Lyric Search</div>
-    <h1>Search the lyrics</h1>
-    <p class="subtitle">Enter any word or phrase to find how many times it appears in the song.</p>
+    <h1>Search any text source</h1>
+    <p class="subtitle">Paste a URL pointing to a plain-text file, then enter a keyword to count its occurrences.</p>
 
     <form method="GET" action="/">
+      <div class="field-label">Text source URL</div>
       <input
-        type="text"
-        name="q"
-        placeholder="e.g. love"
-        value="{{ query }}"
+        type="url"
+        name="url"
+        placeholder="https://example.com/lyrics.txt"
+        value="{{ url }}"
         autocomplete="off"
-        autofocus
+        required
       />
-      <button type="submit">Search</button>
+      <p class="hint">
+        Tip: try the <a href="/?url={{ default_url }}&q=love">default song lyrics</a>.
+      </p>
+
+      <div class="field-label" style="margin-top: 8px;">Keyword</div>
+      <div class="row">
+        <input
+          type="text"
+          name="q"
+          placeholder="e.g. love"
+          value="{{ query }}"
+          autocomplete="off"
+          autofocus
+          required
+        />
+        <button type="submit">Search</button>
+      </div>
     </form>
 
     {% if error %}
