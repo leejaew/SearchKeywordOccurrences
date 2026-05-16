@@ -95,4 +95,4 @@ python main.py
 
 ## License
 
-No license declared. If you'd like to reuse this code, please open an issue first.
+Released under the [MIT License](LICENSE). You're free to use, modify, and redistribute it; please keep the copyright notice.
