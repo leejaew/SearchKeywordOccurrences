@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lyric Search</title>
+  <title>Keyword Search</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -194,7 +194,7 @@
 </head>
 <body>
   <div class="card">
-    <div class="label">Lyric Search</div>
+    <div class="label">Keyword Search</div>
     <h1>Search any text source</h1>
     <p class="subtitle">Paste a URL pointing to a plain-text file, then enter a keyword to count its occurrences.</p>
 
@@ -203,7 +203,7 @@
       <input
         type="url"
         name="url"
-        placeholder="https://example.com/lyrics.txt"
+        placeholder="https://example.com/file.txt"
         value="{{ url }}"
         autocomplete="off"
         maxlength="2048"
@@ -211,7 +211,7 @@
         required
       />
       <p class="hint">
-        Tip: try the <a href="/?url={{ default_url }}&q=love">default song lyrics</a>.
+        Tip: try the <a href="/?url={{ default_url }}&q=love">sample text</a>.
       </p>
 
       <div class="field-label" style="margin-top: 8px;">Keyword</div>

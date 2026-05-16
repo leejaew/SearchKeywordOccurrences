@@ -11,7 +11,7 @@ from markupsafe import Markup, escape
 
 app = Flask(__name__)
 
-DEFAULT_LYRICS_URL = "https://raw.githubusercontent.com/leejaew/SearchKeywordOccurrences/main/lyrics.txt"
+DEFAULT_TEXT_URL = "https://raw.githubusercontent.com/leejaew/SearchKeywordOccurrences/main/lyrics.txt"
 
 MAX_URL_LENGTH = 2048
 MAX_QUERY_LENGTH = 200
@@ -44,9 +44,9 @@ HTML_STRIP_TAGS = (
     "menu", "svg", "canvas",
 )
 
-# CSS selectors used to locate the lyric/article body on common sites.
+# CSS selectors used to locate the main readable content on common sites.
 # Tried in order; first non-empty match wins.
-LYRIC_SELECTORS = (
+CONTENT_SELECTORS = (
     '[data-lyrics-container="true"]',           # Genius
     'div.lyrics',                                # Genius (legacy)
     'div[class*="Lyrics__Container"]',           # Genius (newer)
@@ -99,7 +99,7 @@ def is_safe_url(url):
 
 
 def extract_text_from_html(html):
-    """Pull the most lyric-like / article-like text out of an HTML document."""
+    """Pull the most article-like / main-content text out of an HTML document."""
     soup = BeautifulSoup(html, "lxml")
 
     # Strip non-content elements outright.
@@ -112,7 +112,7 @@ def extract_text_from_html(html):
 
     candidates = []
 
-    for selector in LYRIC_SELECTORS:
+    for selector in CONTENT_SELECTORS:
         try:
             elements = soup.select(selector)
         except Exception:
@@ -256,7 +256,7 @@ def index():
     raw_url = request.args.get("url", "")
 
     query = raw_query.strip()[:MAX_QUERY_LENGTH]
-    url = raw_url.strip()[:MAX_URL_LENGTH] or DEFAULT_LYRICS_URL
+    url = raw_url.strip()[:MAX_URL_LENGTH] or DEFAULT_TEXT_URL
 
     result = None
     error = None
@@ -290,7 +290,7 @@ def index():
         error=error,
         query=query,
         url=url,
-        default_url=DEFAULT_LYRICS_URL,
+        default_url=DEFAULT_TEXT_URL,
         max_result_lines=MAX_RESULT_LINES,
     )
 
@@ -302,8 +302,8 @@ def not_found(_):
         result=None,
         error=None,
         query="",
-        url=DEFAULT_LYRICS_URL,
-        default_url=DEFAULT_LYRICS_URL,
+        url=DEFAULT_TEXT_URL,
+        default_url=DEFAULT_TEXT_URL,
         max_result_lines=MAX_RESULT_LINES,
     ), 404
 
